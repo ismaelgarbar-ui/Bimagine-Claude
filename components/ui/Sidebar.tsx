@@ -1,7 +1,8 @@
 'use client'
 
-import { Database, LayoutDashboard, Users, Settings, Zap } from 'lucide-react'
-import Avatar from './Avatar'
+import { useRouter } from 'next/navigation'
+import { Database, LayoutDashboard, Users, Settings, Zap, LogOut } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 type Screen = 'hub' | 'dashboard' | 'workspaces'
 
@@ -14,9 +15,37 @@ const navItems = [
 interface SidebarProps {
   screen: Screen
   setScreen: (s: Screen) => void
+  userEmail: string
 }
 
-export default function Sidebar({ screen, setScreen }: SidebarProps) {
+function UserAvatar({ email, size = 32 }: { email: string; size?: number }) {
+  const initials = email.includes('@')
+    ? email.split('@')[0].slice(0, 2).toUpperCase()
+    : 'BI'
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.32, fontWeight: 700, color: 'white',
+      fontFamily: 'var(--font-plus-jakarta)',
+      border: '2px solid rgba(255,255,255,0.15)',
+      flexShrink: 0,
+    }}>
+      {initials}
+    </div>
+  )
+}
+
+export default function Sidebar({ screen, setScreen, userEmail }: SidebarProps) {
+  const router = useRouter()
+  const supabase = createClient()
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
+
   return (
     <aside style={{
       width: 56, background: 'var(--sidebar-bg)',
@@ -50,13 +79,13 @@ export default function Sidebar({ screen, setScreen }: SidebarProps) {
           }}
           onMouseEnter={e => {
             if (screen !== id) {
-              (e.currentTarget as HTMLButtonElement).style.background = 'var(--sidebar-hover)'
-              ;(e.currentTarget as HTMLButtonElement).style.color = 'rgba(200,205,240,1)'
+              e.currentTarget.style.background = 'var(--sidebar-hover)'
+              e.currentTarget.style.color = 'rgba(200,205,240,1)'
             }
           }}
           onMouseLeave={e => {
-            ;(e.currentTarget as HTMLButtonElement).style.background = screen === id ? 'var(--sidebar-active)' : 'transparent'
-            ;(e.currentTarget as HTMLButtonElement).style.color = screen === id ? 'white' : 'rgba(150,155,190,1)'
+            e.currentTarget.style.background = screen === id ? 'var(--sidebar-active)' : 'transparent'
+            e.currentTarget.style.color = screen === id ? 'white' : 'rgba(150,155,190,1)'
           }}
         >
           <Icon size={17} />
@@ -75,7 +104,23 @@ export default function Sidebar({ screen, setScreen }: SidebarProps) {
       >
         <Settings size={16} />
       </button>
-      <Avatar initials="MR" color="#7C6FE0" size={32} />
+
+      <button
+        onClick={handleLogout}
+        title="Cerrar sesión"
+        style={{
+          width: 38, height: 38, border: 'none', cursor: 'pointer',
+          borderRadius: 8, background: 'transparent',
+          color: 'rgba(100,105,140,1)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          transition: 'all 0.15s',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.15)'; e.currentTarget.style.color = '#F87171' }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(100,105,140,1)' }}
+      >
+        <LogOut size={15} />
+      </button>
+
+      <UserAvatar email={userEmail} size={32} />
       <div style={{ height: 8 }} />
     </aside>
   )

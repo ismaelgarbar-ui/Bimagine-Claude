@@ -18,10 +18,11 @@ const statusBadge: Record<string, { label: string; color: string }> = {
 }
 
 interface WorkspacesScreenProps {
+  userId: string
   onOpen: (workspaceId: string, datasetId?: string) => void
 }
 
-export default function WorkspacesScreen({ onOpen }: WorkspacesScreenProps) {
+export default function WorkspacesScreen({ userId, onOpen }: WorkspacesScreenProps) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -29,19 +30,19 @@ export default function WorkspacesScreen({ onOpen }: WorkspacesScreenProps) {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase.from('workspaces').select('*').order('updated_at', { ascending: false })
+      const { data } = await supabase.from('workspaces').select('*').eq('owner_id', userId).order('updated_at', { ascending: false })
       setWorkspaces(data ?? [])
       setLoading(false)
     }
     load()
-  }, [supabase])
+  }, [supabase, userId])
 
   const createWorkspace = async () => {
     setCreating(true)
     const name = `Workspace ${new Date().toLocaleDateString('es-ES')}`
     const { data } = await supabase
       .from('workspaces')
-      .insert({ name, status: 'draft', owner_id: '00000000-0000-0000-0000-000000000001' })
+      .insert({ name, status: 'draft', owner_id: userId })
       .select().single()
     if (data) setWorkspaces(prev => [data, ...prev])
     setCreating(false)

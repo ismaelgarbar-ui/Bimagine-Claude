@@ -9,7 +9,12 @@ import ShareModal from './ShareModal'
 
 type Screen = 'hub' | 'dashboard' | 'workspaces'
 
-export default function AppShell() {
+interface AppShellProps {
+  userId: string
+  userEmail: string
+}
+
+export default function AppShell({ userId, userEmail }: AppShellProps) {
   const [screen, setScreen]           = useState<Screen>('hub')
   const [workspaceId, setWorkspaceId] = useState<string>('')
   const [datasetId, setDatasetId]     = useState<string>('')
@@ -30,16 +35,17 @@ export default function AppShell() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden' }}>
-      <Sidebar screen={screen} setScreen={setScreen} />
+      <Sidebar screen={screen} setScreen={setScreen} userEmail={userEmail} />
 
       {screen === 'hub' && (
-        <DataHub onConnect={handleConnect} />
+        <DataHub userId={userId} onConnect={handleConnect} />
       )}
 
       {screen === 'dashboard' && workspaceId && datasetId && (
         <DashboardBuilder
           workspaceId={workspaceId}
           datasetId={datasetId}
+          userId={userId}
           onShare={() => setShowShare(true)}
         />
       )}
@@ -56,7 +62,7 @@ export default function AppShell() {
       )}
 
       {screen === 'workspaces' && (
-        <WorkspacesScreen onOpen={handleOpenWorkspace} />
+        <WorkspacesScreen userId={userId} onOpen={handleOpenWorkspace} />
       )}
 
       {showShare && workspaceId && (

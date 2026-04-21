@@ -23,6 +23,7 @@ const detectedTabs = [
 interface DashboardBuilderProps {
   workspaceId: string
   datasetId: string
+  userId: string
   onShare: () => void
 }
 
@@ -39,7 +40,7 @@ interface ChartEntry {
 
 interface Filter { dim: string; val: string }
 
-export default function DashboardBuilder({ workspaceId, datasetId, onShare }: DashboardBuilderProps) {
+export default function DashboardBuilder({ workspaceId, datasetId, onShare }: DashboardBuilderProps) { // userId available if needed for future RLS
   const [rows, setRows]           = useState<Record<string, unknown>[]>([])
   const [columns, setColumns]     = useState<string[]>([])
   const [loading, setLoading]     = useState(true)
@@ -106,18 +107,51 @@ export default function DashboardBuilder({ workspaceId, datasetId, onShare }: Da
     setAiResponse('')
     setQuery('')
 
-    await new Promise(r => setTimeout(r, 1600))
-    setAiTyping(false)
-    setAiResponse(`He analizado tu pregunta: "${val}". Basándome en tus ${rows.length.toLocaleString()} filas y ${columns.length} columnas, he generado las visualizaciones más relevantes a continuación.`)
+    let aiResult: { analysis: string; chartType: ChartType; xKey: string; yKeys: string[]; title: string; subtitle: string } | null = null
 
-    // Auto-generate charts based on data
+    try {
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: val,
+          columns,
+          sampleRows: rows.slice(0, 10),
+          rowCount: rows.length,
+        }),
+      })
+      if (res.ok) aiResult = await res.json()
+    } catch {
+      // fallback below
+    }
+
+    setAiTyping(false)
+
+    // Build charts from AI result or fallback to heuristic
     const newCharts: ChartEntry[] = []
-    if (numericCols.length >= 2 && categoryCols.length >= 1) {
-      newCharts.push({ id: `c-${Date.now()}-1`, type: 'bar', title: `${numericCols[0]} por ${categoryCols[0]}`, subtitle: `${rows.length.toLocaleString()} registros`, size: 'lg', palette: 'violet', xKey: categoryCols[0], yKeys: numericCols.slice(0, 2) })
-      newCharts.push({ id: `c-${Date.now()}-2`, type: 'line', title: 'Evolución de valores', subtitle: 'Serie temporal', size: 'md', palette: 'ocean', xKey: categoryCols[0], yKeys: [numericCols[0]] })
-      newCharts.push({ id: `c-${Date.now()}-3`, type: 'donut', title: 'Distribución', subtitle: `Por ${categoryCols[0]}`, size: 'md', palette: 'warm', xKey: categoryCols[0], yKeys: [numericCols[0]] })
-    } else if (numericCols.length >= 1) {
-      newCharts.push({ id: `c-${Date.now()}-1`, type: 'bar', title: numericCols[0], subtitle: `${rows.length.toLocaleString()} registros`, size: 'lg', palette: 'violet', xKey: columns[0], yKeys: numericCols.slice(0, 2) })
+    const ts = Date.now()
+
+    if (aiResult && aiResult.chartType) {
+      const xK = columns.includes(aiResult.xKey) ? aiResult.xKey : (categoryCols[0] ?? columns[0])
+      const yKs = aiResult.yKeys.filter(k => columns.includes(k))
+      newCharts.push({ id: `ai-${ts}`, type: aiResult.chartType, title: aiResult.title, subtitle: aiResult.subtitle, size: 'lg', palette: 'violet', xKey: xK, yKeys: yKs.length > 0 ? yKs : [numericCols[0]] })
+      // Add a complementary second chart
+      const secondType: ChartType = aiResult.chartType === 'bar' ? 'line' : 'bar'
+      if (numericCols.length >= 1) {
+        newCharts.push({ id: `ai2-${ts}`, type: secondType, title: secondType === 'line' ? 'Evolución' : 'Comparativa', subtitle: `${rows.length.toLocaleString()} registros`, size: 'md', palette: 'ocean', xKey: xK, yKeys: [numericCols[0]] })
+        newCharts.push({ id: `ai3-${ts}`, type: 'donut', title: 'Distribución', subtitle: `Por ${xK}`, size: 'md', palette: 'warm', xKey: xK, yKeys: [numericCols[0]] })
+      }
+      setAiResponse(aiResult.analysis)
+    } else {
+      // Heuristic fallback
+      if (numericCols.length >= 2 && categoryCols.length >= 1) {
+        newCharts.push({ id: `c-${ts}-1`, type: 'bar', title: `${numericCols[0]} por ${categoryCols[0]}`, subtitle: `${rows.length.toLocaleString()} registros`, size: 'lg', palette: 'violet', xKey: categoryCols[0], yKeys: numericCols.slice(0, 2) })
+        newCharts.push({ id: `c-${ts}-2`, type: 'line', title: 'Evolución de valores', subtitle: 'Serie temporal', size: 'md', palette: 'ocean', xKey: categoryCols[0], yKeys: [numericCols[0]] })
+        newCharts.push({ id: `c-${ts}-3`, type: 'donut', title: 'Distribución', subtitle: `Por ${categoryCols[0]}`, size: 'md', palette: 'warm', xKey: categoryCols[0], yKeys: [numericCols[0]] })
+      } else if (numericCols.length >= 1) {
+        newCharts.push({ id: `c-${ts}-1`, type: 'bar', title: numericCols[0], subtitle: `${rows.length.toLocaleString()} registros`, size: 'lg', palette: 'violet', xKey: columns[0], yKeys: numericCols.slice(0, 2) })
+      }
+      setAiResponse(`He analizado "${val}". Basándome en tus ${rows.length.toLocaleString()} filas y ${columns.length} columnas, he generado las visualizaciones más relevantes.`)
     }
 
     setCharts(newCharts)

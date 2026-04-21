@@ -19,10 +19,11 @@ const recentFiles = [
 ]
 
 interface DataHubProps {
+  userId: string
   onConnect: (workspaceId: string, datasetId: string) => void
 }
 
-export default function DataHub({ onConnect }: DataHubProps) {
+export default function DataHub({ userId, onConnect }: DataHubProps) {
   const [dragOver, setDragOver]       = useState(false)
   const [uploading, setUploading]     = useState(false)
   const [parsed, setParsed]           = useState<ParseResult | null>(null)
@@ -33,7 +34,7 @@ export default function DataHub({ onConnect }: DataHubProps) {
 
   const supabase = createClient()
 
-  const handleFile = useCallback(async (file: File) => {
+  const handleFile = useCallback(async (file: File) => { // eslint-disable-line react-hooks/exhaustive-deps
     setError('')
     setUploading(true)
     setFileName(file.name)
@@ -44,7 +45,7 @@ export default function DataHub({ onConnect }: DataHubProps) {
       // 1. Create workspace
       const { data: ws, error: wsErr } = await supabase
         .from('workspaces')
-        .insert({ name: `Análisis — ${file.name}`, status: 'live', owner_id: '00000000-0000-0000-0000-000000000001' })
+        .insert({ name: `Análisis — ${file.name}`, status: 'live', owner_id: userId })
         .select()
         .single()
       if (wsErr) throw wsErr
