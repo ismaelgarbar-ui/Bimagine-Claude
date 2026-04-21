@@ -97,8 +97,21 @@ export default function DashboardBuilder({ workspaceId, datasetId, onShare }: Da
     '¿Dónde están los outliers?',
   ]
 
-  const numericCols = columns.filter(c => rows.length > 0 && typeof rows[0][c] === 'number')
-  const categoryCols = columns.filter(c => rows.length > 0 && typeof rows[0][c] === 'string')
+  const isNumeric = (col: string) => {
+    for (const row of rows.slice(0, 10)) {
+      const v = row[col]
+      if (v === null || v === undefined) continue
+      if (typeof v === 'number') return true
+      if (typeof v === 'string') {
+        const n = Number(String(v).replace(/[$€%,\s]/g, '').trim())
+        return !isNaN(n) && String(v).trim() !== ''
+      }
+      return false
+    }
+    return false
+  }
+  const numericCols = columns.filter(isNumeric)
+  const categoryCols = columns.filter(c => rows.length > 0 && !isNumeric(c) && rows.slice(0,5).some(r => r[c] !== null && r[c] !== undefined))
 
   const handleQuery = async (q: string) => {
     const val = q || query

@@ -46,11 +46,38 @@ export default function ChartRenderer({ type, data, palette = 'violet', xKey, yK
     )
   }
 
-  const keys = yKeys ?? (Object.keys(data[0]).filter(k => k !== xKey && typeof data[0][k] === 'number').slice(0, 4))
-  const xK = xKey ?? Object.keys(data[0])[0]
+  // Coerce string numbers to real numbers so Recharts can render them
+  const isNumericCol = (col: string) => {
+    for (const row of data.slice(0, 10)) {
+      const v = row[col]
+      if (v === null || v === undefined) continue
+      if (typeof v === 'number') return true
+      if (typeof v === 'string' && !isNaN(Number(v.replace(/[$€%,\s]/g, ''))) && v.trim() !== '') return true
+      return false
+    }
+    return false
+  }
+
+  const coercedData = data.map(row => {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(row)) {
+      if (typeof v === 'string') {
+        const n = Number(v.replace(/[$€%,\s]/g, '').trim())
+        out[k] = !isNaN(n) && v.trim() !== '' ? n : v
+      } else {
+        out[k] = v
+      }
+    }
+    return out
+  })
+
+  const allCols = Object.keys(coercedData[0])
+  const keys = yKeys?.filter(k => allCols.includes(k)) ??
+    allCols.filter(k => k !== xKey && isNumericCol(k)).slice(0, 4)
+  const xK = xKey ?? allCols[0]
 
   const commonProps = {
-    data,
+    data: coercedData,
     margin: { top: 4, right: 4, bottom: compact ? 0 : 16, left: compact ? -20 : 0 },
   }
 
